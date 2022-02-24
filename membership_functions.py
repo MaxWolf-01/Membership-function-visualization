@@ -1,16 +1,21 @@
 import math
+import re
 from abc import ABC, abstractmethod
+from functools import wraps
+from typing import Dict, Type
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class MembershipFunction(ABC):
     def __init__(self, a: float, b: float, y_min: float = 0, y_max: float = 1):
         self.a = a
         self.b = b
-        self._y_min = y_min
-        self._y_max = y_max
+        self.y_min = y_min
+        self.y_max = y_max
+
+    REQUIRED_INIT_ARGUMENTS = ['a', 'b']
 
     @property
     def y_min(self) -> float:
@@ -30,7 +35,7 @@ class MembershipFunction(ABC):
     def y_max(self, val):
         if val > 1:
             raise ValueError("Max for membership can't be more than 1")
-        self.y_max = val
+        self._y_max = val
 
     @abstractmethod
     def calculate_y(self, x: float) -> float:
@@ -38,12 +43,19 @@ class MembershipFunction(ABC):
 
     def plot(self, *args, details: int = 25) -> None:
         """
-        Plots values in specified range e.g.: plot(10) -> plots from 0 to 10
+        Plots function and its parameters in apropriate range.
         :param details: the amount of evenly spaced x-values computed e.g: details=1 => 10 values for a range of 10
         :param args: start and stop parameter for the range of x values
         """
         start, stop = 0, 10
-        if len(args) == 1:
+        if len(args) == 0:
+            d = abs(self.b - self.a) / 5
+            start = math.floor(self.a - d)
+            stop = math.ceil(self.b + d)
+            print(start)
+            print(stop)
+            print(d)
+        elif len(args) == 1:
             stop = args[0]
         elif len(args) == 2:
             start, stop = args
@@ -54,7 +66,7 @@ class MembershipFunction(ABC):
         figure, axes = plt.subplots()
         axes.set_ylabel("μ(x)")
         axes.set_xlabel("x")
-        axes.plot(x_axis, y_axis)
+        axes.plot(x_axis, y_axis, label=f'{type(self).__name__}')
         axes.plot(x_axis, [self.y_max] * len(x_axis), 'g:', label="y_max")
         axes.plot(x_axis, [self.y_min] * len(x_axis), 'r:', label="y_min")
         axes.axvline(x=self.a, ls=':', color='y', label='a')
@@ -87,6 +99,8 @@ class Triangle(MembershipFunction):
         super().__init__(a, b, **kwargs)
         self.m = m
 
+    REQUIRED_INIT_ARGUMENTS = ['a', 'm', 'b']
+
     def calculate_y(self, x):
         if (x <= self.a) or (x >= self.b):
             return self.y_min
@@ -101,6 +115,8 @@ class Trapezoidal(MembershipFunction):
         super().__init__(a, b, **kwargs)
         self.m1 = m1
         self.m2 = m2
+
+    REQUIRED_INIT_ARGUMENTS = ['a', 'm1', 'm2', 'b']
 
     def calculate_y(self, x) -> float:
         if (x <= self.a) or (x >= self.b):
@@ -136,9 +152,11 @@ class Z(MembershipFunction):
 
 
 class Pi(MembershipFunction):
-    def __init__(self, a, m: float, b, **kwargs):  # (m was originally named b in school exercise, b->c..)
+    def __init__(self, a, m: float, b, **kwargs):
         super().__init__(a, b, **kwargs)
         self.m = m
+
+    REQUIRED_INIT_ARGUMENTS = ['a', 'm', 'b']
 
     def calculate_y(self, x: float) -> float:
         if x <= self.m:
@@ -147,14 +165,88 @@ class Pi(MembershipFunction):
             return Z(a=self.m, b=self.b, y_max=self.y_max, y_min=self.y_min).calculate_y(x)
 
 
+def get_init_kwargs_input() -> Dict[str, float]:
+    info = 'Additional parameters (default: y_max=1, y_min=0). Write e.g.: y_max: 0.5 \nPress Enter to skip'
+    print(info)
+    kwargs = {}
+    while True:
+        _in = str(input('y_max/min:value => '))
+        if _in == '':
+            break
+        arg_colon_val_regex = re.compile('(y_min|y_max)\s*:\s*(\??[0-9]*[.]?[0-9]+)')
+        match = arg_colon_val_regex.search(_in)
+        if not match:
+            print('invalid Input format')
+            continue
+        groups = arg_colon_val_regex.search(_in).groups()
+        kwargs[groups[0]] = float(groups[1])
+    return kwargs
+
+
+def get_init_args_input(f: Type[MembershipFunction]) -> list:
+    args = []
+    for arg in f.REQUIRED_INIT_ARGUMENTS:
+        while True:
+            arg_val = get_arg_val_input(arg)
+            if arg_val:
+                break
+        args.append(arg_val)
+    return args
+
+
+def handle_value_error(f, return_on_fail=False, msg: str = "Invalid input"):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValueError as e:
+            if msg:
+                print(msg)
+            print(e)
+            return return_on_fail
+
+    return wrapper
+
+
+@handle_value_error
+def get_arg_val_input(arg_name: str) -> float:
+    return float(input(f'{arg_name}: '))
+
+
+@handle_value_error
+def instantiate_membership_function(F: Type[MembershipFunction], args: list, kwargs: dict) -> MembershipFunction:
+    return F(*args, **kwargs)
+
+
+def main():
+    while True:
+        functions = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
+        print(f'Functions: {", ".join(functions)}')
+        F = functions.get(input('Choose function:'))
+        if not F:
+            print("Unrecognized function\nShowing examples...")
+            examples()
+            continue
+        print(f'{F.__name__} - membership function\nEnter parameters:')
+
+        args = get_init_args_input(F)
+        kwargs = get_init_kwargs_input()
+        f = instantiate_membership_function(F, args, kwargs)
+        if not f:
+            continue
+
+        f.plot()  # tdo: other stuff to do with f or (gui) [sliders for all parameters,...]
+
+
 def examples():
-    Linear(a=4, b=6, y_max=0.69, y_min=0.2).plot(10)
-    Triangle(a=1, b=5, m=3).plot(6)
-    Trapezoidal(a=1, b=9, m1=4, m2=6).plot(10)
-    S(2, 8, y_min=0.5).plot(10)
-    Z(2, 8).plot(10)
-    Pi(2, 5, 8, y_max=0.69, y_min=0.42).plot(10)
+    Linear(a=4, b=6, y_max=0.69, y_min=0.2).plot()
+    Triangle(a=1, b=5, m=3).plot()
+    Trapezoidal(a=1, b=9, m1=4, m2=6).plot()
+    S(2, 8, y_min=0.5).plot()
+    Z(2, 8).plot()
+    Pi(2, 5, 8, y_max=0.69, y_min=0.42).plot()
 
 
 if __name__ == '__main__':
-    examples()
+    main()
+
