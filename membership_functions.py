@@ -52,9 +52,6 @@ class MembershipFunction(ABC):
             d = abs(self.b - self.a) / 5
             start = math.floor(self.a - d)
             stop = math.ceil(self.b + d)
-            print(start)
-            print(stop)
-            print(d)
         elif len(args) == 1:
             stop = args[0]
         elif len(args) == 2:
