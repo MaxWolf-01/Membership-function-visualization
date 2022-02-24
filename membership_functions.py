@@ -67,7 +67,7 @@ class MembershipFunction(ABC):
         axes.plot(x_axis, [self.y_max] * len(x_axis), 'g:', label="y_max")
         axes.plot(x_axis, [self.y_min] * len(x_axis), 'r:', label="y_min")
         axes.axvline(x=self.a, ls=':', color='y', label='a')
-        axes.axvline(x=self.b, ls=':', color='m', label='m')
+        axes.axvline(x=self.b, ls=':', color='m', label='b')
         if hasattr(self, 'm'):
             axes.axvline(x=self.m, ls=':', color='c', label='m')
         if hasattr(self, 'm1'):
