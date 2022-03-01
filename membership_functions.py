@@ -6,6 +6,7 @@ from typing import Dict, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.figure import Figure
 
 
 class MembershipFunction(ABC):
@@ -23,8 +24,8 @@ class MembershipFunction(ABC):
 
     @y_min.setter
     def y_min(self, val):
-        if val < 0:
-            raise ValueError("Min for membership can't be less than 0")
+        if val < 0 or val >= 1:
+            raise ValueError("Min for membership can't be < 0 or >= 1")
         self._y_min = val
 
     @property
@@ -33,15 +34,15 @@ class MembershipFunction(ABC):
 
     @y_max.setter
     def y_max(self, val):
-        if val > 1:
-            raise ValueError("Max for membership can't be more than 1")
+        if val > 1 or val <= 0:
+            raise ValueError("Max for membership can't be > 1 or <= 0")
         self._y_max = val
 
     @abstractmethod
     def calculate_y(self, x: float) -> float:
         pass
 
-    def plot(self, *args, details: int = 25) -> None:
+    def plot(self, *args, details: int = 25) -> Figure:
         """
         Plots function and its parameters in apropriate range.
         :param details: the amount of evenly spaced x-values computed e.g: details=1 => 10 values for a range of 10
@@ -76,6 +77,8 @@ class MembershipFunction(ABC):
             axes.axvline(x=self.m2, ls=':', color='aqua', label='m2')
         axes.legend(loc=0)
         plt.show()
+
+        return figure
 
 
 class Linear(MembershipFunction):
@@ -216,10 +219,11 @@ def instantiate_membership_function(F: Type[MembershipFunction], args: list, kwa
 
 
 def main():
+    # TODO cli with rich https://youtu.be/4zbehnz-8QU and simple gui for sliding params, etc...
     while True:
-        functions = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
-        print(f'Functions: {", ".join(functions)}')
-        F = functions.get(input('Choose function:'))
+        FUNCTIONS = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
+        print(f'Functions: {", ".join(FUNCTIONS)}')
+        F = FUNCTIONS.get(input('Choose function:'))
         if not F:
             print("Unrecognized function\nShowing examples...")
             examples()
@@ -232,7 +236,17 @@ def main():
         if not f:
             continue
 
-        f.plot()  # tdo: other stuff to do with f or (gui) [sliders for all parameters,...]
+        f.plot()
+
+        print('X to exit\nCalculate specific point:')
+        while True:
+            in_ = input("x: ")
+            if in_ in 'xX':
+                break
+            in_ = float(in_)
+            print(f.calculate_y(in_))
+
+        # TODO print general formula with variables
 
 
 def examples():
@@ -246,4 +260,3 @@ def examples():
 
 if __name__ == '__main__':
     main()
-
