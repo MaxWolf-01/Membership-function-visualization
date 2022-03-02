@@ -1,3 +1,4 @@
+import inspect
 import math
 import re
 from abc import ABC, abstractmethod
@@ -7,8 +8,7 @@ from typing import Dict, Type
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
-
-import inspect
+from sympy import simplify
 
 
 class MembershipFunction(ABC):
@@ -44,11 +44,25 @@ class MembershipFunction(ABC):
     def calculate_y(self, x: float) -> float:
         pass
 
-    @abstractmethod
-    def print_formula(self) -> None:
-        """prints the formula of the function with the inserted values"""
-        # todo with inspect & regex (also og + simplified forms)
-        pass
+    def print_function_def(self) -> None:
+        """prints the function definition with values inserted into formula and in simplified version"""
+        method_body = inspect.getsource(self.calculate_y)
+        if_statement_regex = re.compile('if (.+):')
+        return_statement_regex = re.compile('return (.+)')
+        ifs = if_statement_regex.findall(method_body)
+        returns = return_statement_regex.findall(method_body)
+
+        vars_ = vars(self)
+        for var in vars_:
+            for i, (if_, return_) in enumerate(zip(ifs, returns)):
+                ifs[i] = if_.replace(f"self.{var.lstrip('_')}", str(vars_[var]))
+                returns[i] = return_.replace(f"self.{var.lstrip('_')}", str(vars_[var]))
+
+        f_definition = f'{type(self).__name__} := {{\n'
+        for if_, return_ in zip(ifs, returns):
+            f_definition += f'{if_}: {return_} ==> {simplify(return_)}\n'
+
+        print(f_definition)
 
     def plot(self, detail: int = 15 ** 4) -> Figure:
         """
@@ -99,14 +113,6 @@ class Linear(MembershipFunction):
         if self.a < x < self.b:
             return self.y_min + ((self.y_max - self.y_min) / (self.b - self.a)) * (x - self.a)
 
-    def print_formula(self) -> None:
-        formula = f"L = {{\n" \
-                  f"x <= {self.a}: {self.y_min}\n" \
-                  f"x >= {self.b}: {self.y_max}\n" \
-                  f"{self.a} < x < {self.b}: {self.y_min} + (({self.y_max} - {self.y_min}) / ({self.b} - {self.a})) " \
-                  f"* (x - {self.a})\n"
-        print(formula)
-
 
 class Triangle(MembershipFunction):
     def __init__(self, a, m: float, b, **kwargs):
@@ -122,14 +128,6 @@ class Triangle(MembershipFunction):
             return self.y_min + (self.y_max - self.y_min) / (self.m - self.a) * (x - self.a)
         if self.m <= x < self.b:
             return self.y_max - (self.y_max - self.y_min) / (self.b - self.m) * (x - self.m)
-
-    def print_formula(self) -> None:
-        pass  # todo with regex
-        # formula = f"Triangle = {{\n" \
-        #           f"x <= {self.a} or x >= {self.b}: {self.y_min}\n" \
-        #           f"{self.a} < x < {self.m}: {self.y_min} + ({self.y_max} - {self.y_min}) / ({self.m} - {self.a) * (x - self.a)" \
-        #
-        # print(formula)
 
 
 class Trapezoidal(MembershipFunction):
@@ -151,9 +149,6 @@ class Trapezoidal(MembershipFunction):
         if self.m2 <= x < self.b:
             return self.y_max - (y_max_minus_min / (self.b - self.m2)) * (x - self.m2)
 
-    def print_formula(self) -> None:
-        pass
-
 
 class S(MembershipFunction):
 
@@ -167,9 +162,6 @@ class S(MembershipFunction):
         if (self.a + self.b) / 2 < x <= self.b:
             return self.y_min + (1 - 2 * math.pow((self.b - x) / (self.b - self.a), 2)) * (self.y_max - self.y_min)
 
-    def print_formula(self) -> None:
-        pass
-
 
 class Z(MembershipFunction):
     def __init__(self, a, b, **kwargs):
@@ -178,8 +170,8 @@ class Z(MembershipFunction):
     def calculate_y(self, x: float) -> float:
         return self.y_max + self.y_min - S(a=self.a, b=self.b, y_max=self.y_max, y_min=self.y_min).calculate_y(x)
 
-    def print_formula(self) -> None:
-        pass
+    def print_function_def(self) -> None:
+        pass  # todo
 
 
 class Pi(MembershipFunction):
@@ -195,8 +187,8 @@ class Pi(MembershipFunction):
         else:
             return Z(a=self.m, b=self.b, y_max=self.y_max, y_min=self.y_min).calculate_y(x)
 
-    def print_formula(self) -> None:
-        pass
+    def print_function_def(self) -> None:
+        pass  # if ... S.printformula ... if ... ... todo
 
 
 def get_init_kwargs_input() -> Dict[str, float]:
@@ -262,9 +254,8 @@ def ask_to_calculate_y(f: MembershipFunction) -> bool:
     return True
 
 
-# noinspection PyTypeChecker
 def main():
-    # TODO cli with rich https://youtu.be/4zbehnz-8QU ? and simple gui for sliding params, etc...
+    # cli with rich https://youtu.be/4zbehnz-8QU ? and simple gui for sliding params, etc...?
     while True:
         FUNCTIONS = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
         print(f'Functions: {", ".join(FUNCTIONS)}')
@@ -278,11 +269,11 @@ def main():
 
         args = get_init_args_input(F)
         kwargs = get_init_kwargs_input()
-        f = instantiate_membership_function(F, args, kwargs)
+        f: MembershipFunction = instantiate_membership_function(F, args, kwargs)
         if not f:
             continue
 
-        # f.print_formula()
+        f.print_function_def()
         f.plot()
 
         print('Calculate specific points:\n(Any key to exit...)')
