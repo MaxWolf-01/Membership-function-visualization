@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
+import inspect
+
 
 class MembershipFunction(ABC):
     def __init__(self, a: float, b: float, y_min: float = 0, y_max: float = 1):
@@ -42,23 +44,27 @@ class MembershipFunction(ABC):
     def calculate_y(self, x: float) -> float:
         pass
 
-    def plot(self, *args, details: int = 25) -> Figure:
+    @abstractmethod
+    def print_formula(self) -> None:
+        """prints the formula of the function with the inserted values"""
+        # todo with inspect & regex (also og + simplified forms)
+        pass
+
+    def plot(self, detail: int = 15 ** 4) -> Figure:
         """
         Plots function and its parameters in apropriate range.
-        :param details: the amount of evenly spaced x-values computed e.g: details=1 => 10 values for a range of 10
-        :param args: start and stop parameter for the range of x values
+        :param detail: the amount of evenly spaced x-values computed
         """
-        start, stop = 0, 10
-        if len(args) == 0:
-            d = abs(self.b - self.a) / 5
-            start = math.floor(self.a - d)
-            stop = math.ceil(self.b + d)
-        elif len(args) == 1:
-            stop = args[0]
-        elif len(args) == 2:
-            start, stop = args
+        difference_a_b = abs(self.b - self.a) / 8
+        start = self.a - difference_a_b
+        stop = self.b + difference_a_b
 
-        x_axis = np.linspace(start, stop, num=(stop - start) * details)
+        x_axis = np.linspace(math.floor(start), math.ceil(stop), num=detail)
+        #           whyy does it only take integers here?
+        # computing more numbers than necessary (for small differences between a and b; loosing lots of precision)
+        mask = ((x_axis >= start) & (x_axis <= stop))
+
+        x_axis = x_axis[mask]
         y_axis = [self.calculate_y(x) for x in x_axis]
 
         figure, axes = plt.subplots()
@@ -76,7 +82,7 @@ class MembershipFunction(ABC):
         if hasattr(self, 'm2'):
             axes.axvline(x=self.m2, ls=':', color='aqua', label='m2')
         axes.legend(loc=0)
-        plt.show()
+        plt.show(block=False)
 
         return figure
 
@@ -86,12 +92,20 @@ class Linear(MembershipFunction):
         super().__init__(a, b, **kwargs)
 
     def calculate_y(self, x: float) -> float:
-        if x < self.a:
+        if x <= self.a:
             return self.y_min
-        if x > self.b:
+        if x >= self.b:
             return self.y_max
         if self.a < x < self.b:
             return self.y_min + ((self.y_max - self.y_min) / (self.b - self.a)) * (x - self.a)
+
+    def print_formula(self) -> None:
+        formula = f"L = {{\n" \
+                  f"x <= {self.a}: {self.y_min}\n" \
+                  f"x >= {self.b}: {self.y_max}\n" \
+                  f"{self.a} < x < {self.b}: {self.y_min} + (({self.y_max} - {self.y_min}) / ({self.b} - {self.a})) " \
+                  f"* (x - {self.a})\n"
+        print(formula)
 
 
 class Triangle(MembershipFunction):
@@ -108,6 +122,14 @@ class Triangle(MembershipFunction):
             return self.y_min + (self.y_max - self.y_min) / (self.m - self.a) * (x - self.a)
         if self.m <= x < self.b:
             return self.y_max - (self.y_max - self.y_min) / (self.b - self.m) * (x - self.m)
+
+    def print_formula(self) -> None:
+        pass  # todo with regex
+        # formula = f"Triangle = {{\n" \
+        #           f"x <= {self.a} or x >= {self.b}: {self.y_min}\n" \
+        #           f"{self.a} < x < {self.m}: {self.y_min} + ({self.y_max} - {self.y_min}) / ({self.m} - {self.a) * (x - self.a)" \
+        #
+        # print(formula)
 
 
 class Trapezoidal(MembershipFunction):
@@ -129,6 +151,9 @@ class Trapezoidal(MembershipFunction):
         if self.m2 <= x < self.b:
             return self.y_max - (y_max_minus_min / (self.b - self.m2)) * (x - self.m2)
 
+    def print_formula(self) -> None:
+        pass
+
 
 class S(MembershipFunction):
 
@@ -142,6 +167,9 @@ class S(MembershipFunction):
         if (self.a + self.b) / 2 < x <= self.b:
             return self.y_min + (1 - 2 * math.pow((self.b - x) / (self.b - self.a), 2)) * (self.y_max - self.y_min)
 
+    def print_formula(self) -> None:
+        pass
+
 
 class Z(MembershipFunction):
     def __init__(self, a, b, **kwargs):
@@ -149,6 +177,9 @@ class Z(MembershipFunction):
 
     def calculate_y(self, x: float) -> float:
         return self.y_max + self.y_min - S(a=self.a, b=self.b, y_max=self.y_max, y_min=self.y_min).calculate_y(x)
+
+    def print_formula(self) -> None:
+        pass
 
 
 class Pi(MembershipFunction):
@@ -164,19 +195,23 @@ class Pi(MembershipFunction):
         else:
             return Z(a=self.m, b=self.b, y_max=self.y_max, y_min=self.y_min).calculate_y(x)
 
+    def print_formula(self) -> None:
+        pass
+
 
 def get_init_kwargs_input() -> Dict[str, float]:
     info = 'Additional parameters (default: y_max=1, y_min=0). Write e.g.: y_max: 0.5 \nPress Enter to skip'
     print(info)
     kwargs = {}
     while True:
-        _in = str(input('y_max/min:value => '))
+        _in = str(input('y_max/min: '))
+        print(_in)
         if _in == '':
             break
         arg_colon_val_regex = re.compile('(y_min|y_max)\s*:\s*(\??[0-9]*[.]?[0-9]+)')
         match = arg_colon_val_regex.search(_in)
         if not match:
-            print('invalid Input format')
+            print('invalid input format')
             continue
         groups = arg_colon_val_regex.search(_in).groups()
         kwargs[groups[0]] = float(groups[1])
@@ -187,30 +222,31 @@ def get_init_args_input(f: Type[MembershipFunction]) -> list:
     args = []
     for arg in f.REQUIRED_INIT_ARGUMENTS:
         while True:
-            arg_val = get_arg_val_input(arg)
+            arg_val = get_float_input(arg)
             if arg_val:
                 break
         args.append(arg_val)
     return args
 
 
-def handle_value_error(f, return_on_fail=False, msg: str = "Invalid input"):
+def handle_value_error(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, return_on_fail=False, msg: str = "Invalid input", print_err: bool = True, **kwargs):
         try:
             return f(*args, **kwargs)
         except ValueError as e:
             if msg:
                 print(msg)
-            print(e)
+            if print_err:
+                print(e)
             return return_on_fail
 
     return wrapper
 
 
 @handle_value_error
-def get_arg_val_input(arg_name: str) -> float:
-    return float(input(f'{arg_name}: '))
+def get_float_input(input_txt: str) -> float:
+    return float(input(f'{input_txt}: '))
 
 
 @handle_value_error
@@ -218,15 +254,25 @@ def instantiate_membership_function(F: Type[MembershipFunction], args: list, kwa
     return F(*args, **kwargs)
 
 
+def ask_to_calculate_y(f: MembershipFunction) -> bool:
+    _in = get_float_input('x', msg='', print_err=False)
+    if not _in and isinstance(_in, bool):
+        return False
+    print(f.calculate_y(_in))
+    return True
+
+
+# noinspection PyTypeChecker
 def main():
-    # TODO cli with rich https://youtu.be/4zbehnz-8QU and simple gui for sliding params, etc...
+    # TODO cli with rich https://youtu.be/4zbehnz-8QU ? and simple gui for sliding params, etc...
     while True:
         FUNCTIONS = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
         print(f'Functions: {", ".join(FUNCTIONS)}')
         F = FUNCTIONS.get(input('Choose function:'))
         if not F:
-            print("Unrecognized function\nShowing examples...")
-            examples()
+            _in = input("Unrecognized function\n'e' for examples\nAny key to continue... : ")
+            if _in in 'eE' and _in != '':
+                examples()
             continue
         print(f'{F.__name__} - membership function\nEnter parameters:')
 
@@ -236,17 +282,13 @@ def main():
         if not f:
             continue
 
+        # f.print_formula()
         f.plot()
 
-        print('X to exit\nCalculate specific point:')
+        print('Calculate specific points:\n(Any key to exit...)')
         while True:
-            in_ = input("x: ")
-            if in_ in 'xX':
+            if not ask_to_calculate_y(f):
                 break
-            in_ = float(in_)
-            print(f.calculate_y(in_))
-
-        # TODO print general formula with variables
 
 
 def examples():
@@ -256,6 +298,24 @@ def examples():
     S(2, 8, y_min=0.5).plot()
     Z(2, 8).plot()
     Pi(2, 5, 8, y_max=0.69, y_min=0.42).plot()
+
+
+def test():
+    # testing if edge cases are accounted for in implementations of calculate_y
+    FUNCTIONS = [Linear(a=10, b=40), Triangle(a=10, b=40, m=15), Trapezoidal(a=10, b=40, m1=15, m2=30),
+                 S(a=10, b=40), Z(a=10, b=40), Pi(a=10, b=40, m=15)]
+    x_test_values = {
+        'a': 10,
+        'm': 15,
+        'm1': 15,
+        'm2': 30,
+        'b': 40
+    }
+    for f in FUNCTIONS:
+        for x_val in x_test_values:
+            if hasattr(f, x_val):
+                assert f.calculate_y(x_test_values[x_val]) is not None
+    print("Passed!")
 
 
 if __name__ == '__main__':
