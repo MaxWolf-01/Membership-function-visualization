@@ -8,7 +8,7 @@ from typing import Dict, Type, List
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
-from sympy import simplify
+from sympy import sympify
 
 
 class MembershipFunction(ABC):
@@ -49,33 +49,29 @@ class MembershipFunction(ABC):
         :returns: the function definition with values inserted into formula and in simplified version
         :param print_ prints the function definition if True
         """
-        ifs = self.get_if_statements()
-        returns = self.get_return_statements()
-
-        ifs = self.insert_vars(ifs)
-        returns = self.insert_vars(returns)
+        ifs = self._insert_vars(self._get_if_statements())
+        returns = self._insert_vars(self._get_return_statements())
 
         f_definition = f'{type(self).__name__} := {{\n'
-        for if_, return_ in zip(ifs, returns):
-            f_definition += f'{if_}: {return_} ==> {simplify(return_).evalf(3)}\n'
+        f_definition += self._build_function_definition(ifs, returns)
 
         if print_:
             print(f_definition)
         return f_definition
 
-    def get_if_statements(self) -> List[str]:
+    def _get_if_statements(self) -> List[str]:
         """:returns: expression in if statements of self.calculate_y"""
         if_statement_regex = re.compile('if (.+):')
         method_body = inspect.getsource(self.calculate_y)
         return if_statement_regex.findall(method_body)
 
-    def get_return_statements(self) -> List[str]:
+    def _get_return_statements(self) -> List[str]:
         """:returns: expression in return statements of self.calculate_y"""
         return_statement_regex = re.compile('return (.+)')
         method_body = inspect.getsource(self.calculate_y)
         return return_statement_regex.findall(method_body)
 
-    def insert_vars(self, expressions: List[str]) -> list:
+    def _insert_vars(self, expressions: List[str]) -> list:
         """:returns: List of expressions with all text equal to any instance variable replaced with the corresponding
         \value """
         vars_ = vars(self)
@@ -83,6 +79,15 @@ class MembershipFunction(ABC):
             for i, expr in enumerate(expressions):
                 expressions[i] = expr.replace(f"self.{var.lstrip('_')}", str(vars_[var]))
         return expressions
+
+    @staticmethod
+    def _build_function_definition(ifs: List[str], returns: List[str], float_prec: int = 4) -> str:
+        """:returns: the function definition with inserted values and its simplified form"""
+        f_def = ''
+        for if_, return_ in zip(ifs, returns):
+            sympify_return = sympify(return_)
+            f_def += f'\t{if_}:\n\t\t{return_} ==> {sympify_return.evalf(float_prec)}\n'
+        return f_def
 
     def plot(self, detail: int = 15 ** 4) -> Figure:
         """
@@ -177,9 +182,9 @@ class S(MembershipFunction):
         if x > self.b:
             return self.y_max
         if self.a < x <= (self.a + self.b) / 2:
-            return self.y_min + 2 * pow((x - self.a) / (self.b - self.a), 2) * (self.y_max - self.y_min)
+            return self.y_min + 2 * ((x - self.a) / (self.b - self.a)) ** 2 * (self.y_max - self.y_min)
         if (self.a + self.b) / 2 < x <= self.b:
-            return self.y_min + (1 - 2 * pow((self.b - x) / (self.b - self.a), 2)) * (self.y_max - self.y_min)
+            return self.y_min + (1 - 2 * ((self.b - x) / (self.b - self.a)) ** 2) * (self.y_max - self.y_min)
 
 
 class Z(MembershipFunction):
@@ -191,12 +196,14 @@ class Z(MembershipFunction):
 
     def get_function_def(self, print_: bool = True) -> str:
         s = S(a=self.a, b=self.b, y_max=self.y_max, y_min=self.y_min)
-        ifs = self.insert_vars(s.get_if_statements())
-        returns = self.insert_vars(s.get_return_statements())
+
+        ifs = self._insert_vars(s._get_if_statements())
+        returns = self._insert_vars(s._get_return_statements())
+        returns = [f'{self.y_max} + {self.y_min} - {return_}' for return_ in returns]
+
         f_definition = f'{type(self).__name__} := {{\n'
-        for if_, return_ in zip(ifs, returns):
-            return_ = f'{self.y_max} + {self.y_min} - {return_}'
-            f_definition += f'{if_}: {return_} ==> {simplify(return_)}\n'
+        f_definition += self._build_function_definition(ifs, returns)
+
         if print_:
             print(f_definition)
         return f_definition
@@ -217,10 +224,10 @@ class Pi(MembershipFunction):
 
     def get_function_def(self, print_: bool = True) -> str:
         f_def = f'Pi := {{\n' \
-                f'x <= {self.m}:\n' \
-                f'{S(a=self.a, b=self.m, y_max=self.y_max, y_min=self.y_min).get_function_def(print_=False)}' \
-                f'x > {self.m}:\n' \
-                f'{Z(a=self.m, b=self.b, y_max=self.y_max, y_min=self.y_min).get_function_def(print_=False)}'
+                f' x <= {self.m}:\n' \
+                f'   {S(a=self.a, b=self.m, y_max=self.y_max, y_min=self.y_min).get_function_def(print_=False)}' \
+                f' x > {self.m}:\n' \
+                f'   {Z(a=self.m, b=self.b, y_max=self.y_max, y_min=self.y_min).get_function_def(print_=False)}'
         if print_:
             print(f_def)
         return f_def
@@ -236,6 +243,7 @@ def get_init_kwargs_input() -> Dict[str, float]:
         if _in == '':
             break
         arg_colon_val_regex = re.compile('(y_min|y_max)\s*:\s*(\??[0-9]*[.]?[0-9]+)')
+        # yes, I could do this with 2 if statements, i know
         match = arg_colon_val_regex.search(_in)
         if not match:
             print('invalid input format')
