@@ -9,11 +9,16 @@ To install from PyPI with pip:
 ```bash
 $ python -m pip install mfvis
 ```
+Install the required packages: 
+```bash
+$ python -m pip install -r requirements.txt
+```
 ### Using mfvis
 To start the script through the cli:
 ```bash
 $ python -m mfvis
 ```
+
 
 Example: S-function: <br>  
 
