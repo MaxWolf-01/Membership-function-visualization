@@ -297,34 +297,6 @@ def ask_to_calculate_y(f: MembershipFunction) -> bool:
     return True
 
 
-def main():
-    # cli with rich https://youtu.be/4zbehnz-8QU ? and simple gui for sliding params, etc...?
-    while True:
-        FUNCTIONS = {'L': Linear, 'Tri': Triangle, 'Tra': Trapezoidal, 'S': S, 'Z': Z, 'Pi': Pi}
-        print(f'Functions: {", ".join(FUNCTIONS)}')
-        F = FUNCTIONS.get(input('Choose function:'))
-        if not F:
-            _in = input("Unrecognized function\n'e' for examples\nAny key to continue... : ")
-            if _in in 'eE' and _in != '':
-                examples()
-            continue
-        print(f'{F.__name__} - membership function\nEnter parameters:')
-
-        args = get_init_args_input(F)
-        kwargs = get_init_kwargs_input()
-        f: MembershipFunction = instantiate_membership_function(F, args, kwargs)
-        if not f:
-            continue
-
-        f.get_function_def()
-        f.plot()
-
-        print('Calculate specific points:\n(Any key to exit...)')
-        while True:
-            if not ask_to_calculate_y(f):
-                break
-
-
 def examples():
     Linear(a=4, b=6, y_max=0.69, y_min=0.2).plot()
     Triangle(a=1, b=5, m=3).plot()
@@ -350,7 +322,3 @@ def test():
             if hasattr(f, x_val):
                 assert f.calculate_y(x_test_values[x_val]) is not None
     print("Passed!")
-
-
-if __name__ == '__main__':
-    main()
