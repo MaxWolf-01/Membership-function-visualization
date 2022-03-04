@@ -1,6 +1,6 @@
 from os import environ
 
-from src.mfvis.membership_functions import *
+from membership_functions import *
 
 
 def suppress_qt_warnings():
